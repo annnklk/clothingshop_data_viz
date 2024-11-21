@@ -1,0 +1,164 @@
+
+# Preparations
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readxl)
+library(tidyverse)
+data <- read_excel("C:/clothes.xlsx")
+library(naniar)
+```
+
+Переменные:
+Customer ID - ID клиента
+Age - возраст клиента
+Gender - пол клиента (мужчина/женщина)
+Item Purchased - товар, купленный клиентом
+Category - категория товара
+Purchase Amount (USD) - сумма покупки
+Location - где была совершена покупка
+Size - размер товара
+Color - цвет товара
+Season - сезон покупки
+Review Rating - как клиент оценил товар
+Subscription Status - есть ли у клиента подписка (да/нет)
+Shipping Type - способ доставки
+Discount Applied - была ли применена скидка (да/нет)
+Promo Code Used - был ли применён промокод (да/нет)
+Previous Purchases - сколько покупок было у клиента до заказа
+Payment Method - способ оплаты
+Frequency of Purchases - как часто клиент совершает покупки (каждые три месяца, каждый год, каждый квартал, каждый месяц, каждые две недели)
+
+Рассмотрим данные подробнее:
+
+```{r}
+glimpse(data)
+```
+```{r}
+gg_miss_var(data)
+```
+NA нет во всех переменных
+
+
+Для исследования с помощью визуализации я поставила следующую задачу: собрать некоторые характеристики для определения портрета потребителя, который совершает заказ чаще всего - раз в неделю. Эти пользователи наиболее активны, они доверяют сервису и возвращаются к нему снова и снова. Такую лояльность клиентов надо поддерживать, поэтому важно знать портрет потребителя. 
+
+Для начала отберем только те данные, у которых значение "Weekly" в переменной "Frequency of Purchases".
+
+```{r}
+data_new <- filter(data, `Frequency of Purchases` == "Weekly")
+head(data_new)
+```
+
+
+1. Рассмотрим распределение покупателей по возрасту, причем отдельно покупателей женского и мужского пола.
+
+```{r}
+data_new$Age <- as.numeric(data_new$Age)
+
+ggplot(data_new, aes(x=`Age`)) +
+  geom_histogram(bins=25, fill = '#FFAEB9', color='#8B3E2F') +
+  geom_vline(xintercept = mean(data_new$`Age`), lty = 1, color = "dodgerblue4") +
+  facet_wrap(~Gender, labeller = labeller(Gender=c("Female"="Женщины", "Male"="Мужчины"))) +
+  labs(x = "Возраст",
+    y = "Количество наблюдений",
+    title = "Распределение покупателей по возрасту",
+    subtitle = "Данные о совершенных заказах в магазине одежды",
+    caption = "данные взяты с kaggle.com") +
+  theme_bw() +
+  theme(title = element_text(family = "serif"),
+    plot.title = element_text(face = "bold"),
+    axis.text = element_text(family = "serif")) 
+```
+```{r}
+mean(data_new$Age)
+```
+По графику видно, что пика, который бы значительно превосходил высоту остальных бинов, нет как среди женского пола, так и мужского. Распределение достаточно равномерно. Диапозон возрастов - от 18 до 70 лет. Средний возраст покупателей,заказывающих товары каждую неделю, - 44-45 лет. На этом графике также наглядно заметно, что покупателей мужского пола больше, чем женского.
+
+
+
+2. Узнаем, какая категория товаров наиболее популярна среди покупателей, совершающих заказ еженедельно.
+
+```{r}
+categories <- data_new %>%
+group_by(Category) %>%
+summarise(count = n())
+
+categories$percentage <- categories$count / sum(categories$count) * 100
+
+la <- c("Clothing" = "Одежда", "Accessories"= "Аксссуары", "Outerwear"="Верхняя одежда", "Footwear"="Обувь")
+
+ggplot(categories, aes(x = "", y = count, fill = Category)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  geom_text(aes(label = paste0(round(percentage), "%")), position =   position_stack(vjust = 0.5)) +
+  labs(title = "Распределение категорий товаров по частоте заказов",
+       subtitle = "Данные о совершенных заказах в магазине одежды",
+       caption = "данные взяты с kaggle.com") +
+  theme_void()+
+  theme(title = element_text(family = "serif"),
+        plot.title = element_text(face = "bold"),
+        legend.text=element_text(family="serif"))+
+  scale_fill_manual(values=c("#00FFFF","#FFAEB9","#C1FFC1","#FF83FA"), name = "Категории", labels=la)
+```
+
+По круговой диаграмме видно, что наибольшая доля заказов - покупки из категории "одежда" ("clothing"). На втором месте - аксессуары (accessories), на третьем - обувь(footwear), на четвертом - верхняя одежда(outerwear).
+
+
+3. Исследуем, сколько на еженедельные покупки тратят покупатели, причем рассмотрим отдельно мужчин и женщин.
+
+```{r}
+data_new$`Purchase Amount (USD)`= as.numeric(data_new$`Purchase Amount (USD)`)
+
+ggplot(data_new, aes(x=Gender, y= `Purchase Amount (USD)`)) +
+  geom_boxplot(fill='skyblue', color='darkblue') +
+  labs(x = "Пол",
+       y = "Сумма покупки в долларах",
+       title = "Сколько пользователи тратят на заказ?",
+       subtitle = "Данные о совершенных заказах в магазине одежды",
+       caption = "данные взяты с kaggle.com") +
+  theme_bw() +
+  theme(title = element_text(family = "serif"),
+        plot.title = element_text(face = "bold"),
+        axis.text = element_text(family = "serif"))+
+  scale_x_discrete(labels=c("Female"="Женщины", "Male"="Мужчины"))
+```
+
+Можно сделать вывод, что медиана суммы еженедельного заказа у мужчин немного больше, чем у женщин. У обоих полов разброс значений схож: примерно от 20 до 100 долларов. 50 процентов наблюдений колеблются от 40 до 80 долларов у мужчин, нижний квартиль у женщин немного меньше. Экстремальных значений не наблюдается.
+
+
+4. Для того чтобы вовремя удовлетворять спрос потребителей в полном объеме, важно знать требуемый размерный ряд одежды.
+
+```{r}
+size_count <- data_new %>%
+  group_by(Gender, Size) %>%
+  summarise(count_size = n()) 
+
+ggplot(size_count, aes(x=reorder(Size, -count_size), y=count_size))+
+  geom_col(fill = 'skyblue', color='darkblue') +
+  facet_wrap(~Gender,labeller = labeller(Gender=c("Female"="Женщины", "Male"="Мужчины"))) +
+  labs(x = "Размер", y = "Количество наблюдений",
+       title = "Распределение спроса покупателей на разные размеры одежды",
+       subtitle = "Данные о совершенных заказах в магазине одежды",
+       caption = "данные взяты с kaggle.com") +
+  theme_bw() +
+  theme(title = element_text(family = "serif"), 
+        plot.title = element_text(face = "bold"),
+        axis.text = element_text(family = "serif"))
+```
+
+Наибольшим спросом пользуется размер M, причем у мужчин отрыв от следующего по популярности размера (L) значителен - практически в 2 раза.
+
+
+Построив и исследовав графики, можно сделать некоторые выводы о пользователях, совершающих покупку еженедельно. Во-первых, средний возраст покупателей 44-45 лет. Сервисом пользуются покупатели от 18 до 70 лет. При этом мужчин среди покупателей больше. Во-вторых, чаще всего продается категория "одежда", самый популярный размер - М. В-третьих, медиана суммы заказа немного больше у мужчин, чем у женщин. 50 процентов значений укладывается в промежуток от 40 до 80 долларов. 
+
+Даже такой краткий портрет самых активных пользователей помогает понять особенности этой группы, ее интересы и потребности. 
